@@ -19,7 +19,7 @@ extern "C" {
 
 typedef struct scc_components_s scc_components_t;
 typedef bool (*scc_handle_semicolon_t)(const scc_components_t *comps,
-    void *userinfo);
+    uint32_t decl_line_nr, void *userinfo);
 
 bool scc_read(const char *filepath, scc_handle_semicolon_t cb, void *userinfo,
     char *out_err, size_t out_err_cap);

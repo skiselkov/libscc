@@ -18,7 +18,7 @@ use std::iter::Peekable;
 type Components = Vec<CString>;
 
 type HandleSemicolon = extern "C" fn(comps: *const Components,
-    userinfo: *mut c_void) -> bool;
+    decl_line_nr: u32, userinfo: *mut c_void) -> bool;
 
 fn finish_token(comps: &mut Components, token: String, filepath: &str,
     line_nr: u32) {
@@ -79,6 +79,7 @@ fn scc_read_impl(filepath: &str, cb: HandleSemicolon,
 	let mut token = String::new();
 
 	let mut line_nr = 1u32;
+	let mut decl_line_nr = 0u32;
 
 	let mut chars_it = chars.into_iter().peekable();
 	while let Some(c) = chars_it.next() {
@@ -101,14 +102,24 @@ fn scc_read_impl(filepath: &str, cb: HandleSemicolon,
 			finish_token(&mut comps, std::mem::take(&mut token),
 			    filepath, line_nr);
 		} else if c == ';' {
+			if decl_line_nr == 0 {
+				decl_line_nr = line_nr;
+			}
 			finish_token(&mut comps, std::mem::take(&mut token),
 			    filepath, line_nr);
-			cb(&comps, userinfo);
+			cb(&comps, decl_line_nr, userinfo);
 			comps = Components::default();
+			decl_line_nr = 0u32;
 		} else if c == '"' {
+			if decl_line_nr == 0 {
+				decl_line_nr = line_nr;
+			}
 			read_quoted_str(&mut chars_it, &mut token,
 			    &mut line_nr);
 		} else {
+			if decl_line_nr == 0 {
+				decl_line_nr = line_nr;
+			}
 			token.push(c);
 		}
 	}
@@ -166,8 +177,9 @@ mod tests {
 
 	#[allow(dead_code)]
 	extern "C" fn semicolon_cb(comps: *const scc::Components,
-	    _userinfo: *mut std::ffi::c_void) -> bool {
+	    line_nr: u32, _userinfo: *mut std::ffi::c_void) -> bool {
 		assert!(!comps.is_null());
+		print!("{}: ", line_nr);
 		for i in 0..scc::scc_comp_count(comps) {
 			let c_str = scc::scc_comp_get(comps, i);
 			let tmp = unsafe{std::ffi::CStr::from_ptr(c_str)};
