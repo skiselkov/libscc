@@ -155,7 +155,10 @@ fn strlcpy(out_str: *mut c_char, in_str: &str, cap: usize) {
 	};
 	out_slice.copy_from_slice(in_slice);
 	// make sure the output is always properly NUL terminated
-	out_slice[out_slice.len() - 1] = b'\0';
+	let out_slice_full = unsafe {
+		core::slice::from_raw_parts_mut(out_str as *mut u8, cap)
+	};
+	out_slice_full[cap - 1] = b'\0';
 }
 
 #[no_mangle]
