@@ -14,8 +14,21 @@ use std::ffi::{
 use std::{fs::File, io::Read};
 use std::vec::IntoIter;
 use std::iter::Peekable;
+use std::fmt;
 
 type Components = Vec<CString>;
+
+#[derive(Debug, Default)]
+struct UnderlyingHandlerError {}
+
+impl fmt::Display for UnderlyingHandlerError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f,
+		    "Underlying statement handler function returned `false'")
+    }
+}
+
+impl std::error::Error for UnderlyingHandlerError {}
 
 type HandleSemicolon = extern "C" fn(comps: *const Components,
     decl_line_nr: u32, userinfo: *mut c_void) -> bool;
@@ -66,8 +79,8 @@ fn read_quoted_str(it: &mut Peekable<IntoIter<char>>, token: &mut String,
 	}
 }
 
-fn scc_read_impl(filepath: &str, cb: HandleSemicolon,
-    userinfo: *mut c_void) -> Result<(), std::io::Error> {
+fn read_impl(filepath: &str, cb: HandleSemicolon,
+    userinfo: *mut c_void) -> Result<(), Box<dyn std::error::Error>> {
 	let mut filebuf: Vec<u8> = vec![];
 	File::open(filepath)?.read_to_end(&mut filebuf)?;
 	let chars: Vec<char> = filebuf
@@ -107,7 +120,9 @@ fn scc_read_impl(filepath: &str, cb: HandleSemicolon,
 			}
 			finish_token(&mut comps, std::mem::take(&mut token),
 			    filepath, line_nr);
-			cb(&comps, decl_line_nr, userinfo);
+			if !cb(&comps, decl_line_nr, userinfo) {
+				return Err(Box::new(UnderlyingHandlerError{}))
+			}
 			comps = Components::default();
 			decl_line_nr = 0u32;
 		} else if c == '"' {
@@ -148,7 +163,7 @@ extern "C" fn scc_read(filepath: *const c_char, cb: HandleSemicolon,
     userinfo: *mut c_void, out_err: *mut c_char, out_err_cap: usize) ->
     bool {
 	assert!(!filepath.is_null());
-	match scc_read_impl(unsafe{CStr::from_ptr(filepath)}
+	match read_impl(unsafe{CStr::from_ptr(filepath)}
 	    .to_str().expect("cannot convert C string"), cb, userinfo) {
 	    Ok(_) => true,
 	    Err(e) => {
