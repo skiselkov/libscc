@@ -53,12 +53,7 @@ fn read_string_escape(it: &mut Peekable<IntoIter<char>>, token: &mut String,
     line_nr: &mut u32) {
 	if let Some(esc_c) = it.next() {
 		match esc_c {
-		    't' => token.push('\t'),
-		    'n' => token.push('\n'),
-		    'r' => token.push('\r'),
-		    '\\' => token.push('\\'),
 		    '"' => token.push('"'),
-		    '\'' => token.push('\''),
 		    '\r' => {
 			skip_opt_linefeed(it);
 			*line_nr += 1;
