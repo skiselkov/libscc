@@ -56,6 +56,9 @@ fn read_string_escape(it: &mut Peekable<IntoIter<char>>, token: &mut String,
 		    't' => token.push('\t'),
 		    'n' => token.push('\n'),
 		    'r' => token.push('\r'),
+		    '\\' => token.push('\\'),
+		    '"' => token.push('"'),
+		    '\'' => token.push('\''),
 		    '\r' => {
 			skip_opt_linefeed(it);
 			*line_nr += 1;
@@ -63,7 +66,10 @@ fn read_string_escape(it: &mut Peekable<IntoIter<char>>, token: &mut String,
 		    '\n' => {
 			*line_nr += 1;
 		    },
-		    _ => token.push(esc_c),
+		    _ => {
+			token.push('\\');
+			token.push(esc_c);
+		    },
 		}
 	}
 }
@@ -118,10 +124,15 @@ fn read_impl(filepath: &str, cb: HandleSemicolon,
 			if decl_line_nr == 0 {
 				decl_line_nr = line_nr;
 			}
-			finish_token(&mut comps, std::mem::take(&mut token),
-			    filepath, line_nr);
-			if !cb(&comps, decl_line_nr, userinfo) {
-				return Err(Box::new(UnderlyingHandlerError{}))
+			// skip empty lines containing no text
+			if token.len() != 0 || comps.len() != 0 {
+				finish_token(&mut comps,
+				    std::mem::take(&mut token),
+				    filepath, line_nr);
+				if !cb(&comps, decl_line_nr, userinfo) {
+					return Err(Box::new(
+					    UnderlyingHandlerError{}));
+				}
 			}
 			comps = Components::default();
 			decl_line_nr = 0u32;
